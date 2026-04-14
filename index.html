@@ -1,133 +1,145 @@
 <!DOCTYPE html>
-<html lang="en-us">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity Web Player | FlappyBird_DevOps</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-  </head>
-  <body>
-    <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
-          <div id="unity-progress-bar-full"></div>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SponderBird Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="notice-banner">My citrix wasn't working so I don't have the site from in class :(</div>
+<div id="app">
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="screen active">
+        <div class="auth-container">
+            <div class="logo">
+                <span class="logo-icon">🐦</span>
+                <h1>SponderBird</h1>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Login</button>
+                <button class="auth-tab" data-tab="signup">Sign Up</button>
+            </div>
+            <form id="login-form" class="auth-form active">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit" class="btn-primary">Login</button>
+                <p id="login-error" class="error-msg"></p>
+            </form>
+            <form id="signup-form" class="auth-form">
+                <input type="text" id="signup-username" placeholder="Username" required>
+                <input type="email" id="signup-email" placeholder="Email" required>
+                <input type="password" id="signup-password" placeholder="Password" required>
+                <button type="submit" class="btn-primary">Create Account</button>
+                <p id="signup-error" class="error-msg"></p>
+            </form>
         </div>
-      </div>
-      <div id="unity-warning"> </div>
-      <div id="unity-footer">
-        <div id="unity-logo-title-footer"></div>
-        <div id="unity-fullscreen-button"></div>
-        <div id="unity-build-title">FlappyBird_DevOps</div>
-      </div>
     </div>
-    <script>
-      var canvas = document.querySelector("#unity-canvas");
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        var warningBanner = document.querySelector("#unity-warning");
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
-        }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
-      }
+    <!-- Main App -->
+    <div id="main-app" class="screen">
+        <nav class="main-nav">
+            <div class="nav-brand">
+                <span>🐦</span> SponderBird
+            </div>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-screen="profile">Profile</button>
+                <button class="nav-tab" data-screen="game">Play</button>
+                <button class="nav-tab admin-only" data-screen="admin">Admin</button>
+            </div>
+            <button id="logout-btn" class="btn-logout">Logout</button>
+        </nav>
 
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/game.loader.js";
-      var config = {
-        arguments: [],
-        dataUrl: buildUrl + "/game.data",
-        frameworkUrl: buildUrl + "/game.framework.js",
-        codeUrl: buildUrl + "/game.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "FlappyBird_DevOps",
-        productVersion: "1.0",
-        showBanner: unityShowBanner,
-        // errorHandler: function(err, url, line) {
-        //    alert("error " + err + " occurred at line " + line);
-        //    // Return 'true' if you handled this error and don't want Unity
-        //    // to process it further, 'false' otherwise.
-        //    return true;
-        // },
-      };
+        <!-- Profile Screen -->
+        <div id="profile-screen" class="content-screen active">
+            <div class="profile-section">
+                <div class="profile-card">
+                    <div class="profile-avatar">👤</div>
+                    <h2 id="profile-username">Username</h2>
+                    <p id="profile-email">email@example.com</p>
+                    <div class="profile-stats">
+                        <div class="stat">
+                            <span class="stat-value" id="profile-highscore">0</span>
+                            <span class="stat-label">High Score</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="profile-games">0</span>
+                            <span class="stat-label">Games Played</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="leaderboard-section">
+                <h2>🏆 Leaderboard</h2>
+                <div id="leaderboard" class="leaderboard">
+                    <div class="leaderboard-loading">Loading...</div>
+                </div>
+            </div>
+        </div>
 
-      // By default, Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
+        <!-- Game Screen -->
+        <div id="game-screen" class="content-screen">
+            <div class="game-container">
+                <div class="game-header">
+                    <h2>SponderBird</h2>
+                    <p>Your current high score: <span id="game-highscore">0</span></p>
+                </div>
+                <div id="game-frame-container">
+                    <iframe id="game-frame" src="" allowfullscreen></iframe>
+                    <div class="game-placeholder">
+                        <p>Game will load here</p>
+                        <small>Make sure the WebGL build is deployed</small>
+                    </div>
+                </div>
+                <div class="score-submit">
+                    <input type="number" id="score-input" placeholder="Enter your score">
+                    <button id="submit-score" class="btn-primary">Submit Score</button>
+                </div>
+            </div>
+        </div>
 
-      // If you would like all file writes inside Unity Application.persistentDataPath
-      // directory to automatically persist so that the contents are remembered when
-      // the user revisits the site the next time, uncomment the following line:
-      // config.autoSyncPersistentDataPath = true;
-      // This autosyncing is currently not the default behavior to avoid regressing
-      // existing user projects that might rely on the earlier manual
-      // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
-      // expected to change.
+        <!-- Admin Screen -->
+        <div id="admin-screen" class="content-screen">
+            <div class="admin-header">
+                <h2>📊 Admin Dashboard</h2>
+            </div>
+            <div class="admin-grid">
+                <div class="admin-card">
+                    <h3>Total Players</h3>
+                    <span id="total-players" class="big-stat">0</span>
+                </div>
+                <div class="admin-card">
+                    <h3>Total Games</h3>
+                    <span id="total-games" class="big-stat">0</span>
+                </div>
+                <div class="admin-card">
+                    <h3>Avg Score</h3>
+                    <span id="avg-score" class="big-stat">0</span>
+                </div>
+                <div class="admin-card">
+                    <h3>New Users (7d)</h3>
+                    <span id="new-users" class="big-stat">0</span>
+                </div>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Scores Distribution</h3>
+                    <canvas id="scores-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Daily Active Players</h3>
+                    <canvas id="players-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<footer class="credit-footer">Credit to Claude for the CSS</footer>
 
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-        document.querySelector("#unity-container").className = "unity-mobile";
-        canvas.className = "unity-mobile";
-
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
-
-
-      } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-        canvas.style.width = "960px";
-        canvas.style.height = "600px";
-      }
-
-      document.querySelector("#unity-loading-bar").style.display = "block";
-
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                document.querySelector("#unity-loading-bar").style.display = "none";
-                document.querySelector("#unity-fullscreen-button").onclick = () => {
-                  unityInstance.SetFullscreen(1);
-                };
-
-              }).catch((message) => {
-                alert(message);
-              });
-            };
-
-      document.body.appendChild(script);
-
-    </script>
-  </body>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="module" src="app.js"></script>
+</body>
 </html>
