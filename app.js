@@ -187,6 +187,9 @@ navTabs.forEach(tab => {
         if (screenName === 'admin') {
             loadAdminData();
         }
+        if (screenName === 'game') {
+            setTimeout(focusGameFrame, 50);
+        }
     });
 });
 
@@ -233,18 +236,36 @@ async function loadLeaderboard() {
 }
 
 // Game
+function focusGameFrame() {
+    const gameFrame = document.getElementById('game-frame');
+    if (!gameFrame) return;
+    try {
+        gameFrame.focus();
+        if (gameFrame.contentWindow) gameFrame.contentWindow.focus();
+        const innerCanvas = gameFrame.contentDocument?.getElementById('unity-canvas');
+        if (innerCanvas) innerCanvas.focus();
+    } catch (_) { /* cross-origin focus may throw — safe to ignore */ }
+}
+
 function initGameFrame() {
     const gameFrame = document.getElementById('game-frame');
     const placeholder = document.querySelector('.game-placeholder');
+    const container = document.getElementById('game-frame-container');
 
     gameFrame.src = GAME_URL;
     gameFrame.onload = () => {
         gameFrame.classList.add('loaded');
         placeholder.classList.add('hidden');
+        focusGameFrame();
     };
     gameFrame.onerror = () => {
         placeholder.innerHTML = '<p>Failed to load game</p><small>Check the GAME_URL in app.js</small>';
     };
+
+    if (container && !container.dataset.focusBound) {
+        container.dataset.focusBound = '1';
+        container.addEventListener('mousedown', focusGameFrame);
+    }
 }
 
 // ============================================================
