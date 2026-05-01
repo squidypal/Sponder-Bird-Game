@@ -6,20 +6,22 @@ import {
     signOut,
     onAuthStateChanged 
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-import { 
-    getFirestore, 
-    doc, 
-    setDoc, 
-    getDoc, 
+import {
+    getFirestore,
+    doc,
+    setDoc,
+    getDoc,
     getDocs,
-    collection, 
-    query, 
-    orderBy, 
+    collection,
+    query,
+    orderBy,
     limit,
     updateDoc,
     increment,
     where,
-    Timestamp
+    Timestamp,
+    addDoc,
+    onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 // ============================================================
@@ -234,7 +236,7 @@ async function loadLeaderboard() {
 function initGameFrame() {
     const gameFrame = document.getElementById('game-frame');
     const placeholder = document.querySelector('.game-placeholder');
-    
+
     gameFrame.src = GAME_URL;
     gameFrame.onload = () => {
         gameFrame.classList.add('loaded');
@@ -245,100 +247,105 @@ function initGameFrame() {
     };
 }
 
-// Score submission
-document.getElementById('submit-score').addEventListener('click', async () => {
-    const scoreInput = document.getElementById('score-input');
-    const score = parseInt(scoreInput.value);
-    
-    if (isNaN(score) || score < 0) {
-        alert('Please enter a valid score');
+// ============================================================
+// TELEMETRY
+// Listens for postMessage events from the Unity WebGL build and
+// persists one document per completed session to Firestore.
+// ============================================================
+window.addEventListener('message', async (event) => {
+    const data = event.data;
+    if (!data || data.source !== 'sponderbird-telemetry') return;
+
+    const payload = data.payload || {};
+    if (payload.type !== 'session_end') return;
+
+    if (!currentUser) {
+        console.warn('[telemetry] session_end received with no logged-in user, dropping');
         return;
     }
-    
+
     try {
-        const userRef = doc(db, 'users', currentUser.uid);
-        const updates = {
-            gamesPlayed: increment(1)
-        };
-        
-        if (score > (userData.highScore || 0)) {
+        await addDoc(collection(db, 'sessions'), {
+            uid: currentUser.uid,
+            username: userData?.username || currentUser.email,
+            startTime: payload.startTimeIso ? Timestamp.fromDate(new Date(payload.startTimeIso)) : Timestamp.now(),
+            endTime: payload.endTimeIso ? Timestamp.fromDate(new Date(payload.endTimeIso)) : Timestamp.now(),
+            durationMs: payload.durationMs ?? 0,
+            score: payload.score ?? 0,
+            flaps: payload.flaps ?? 0
+        });
+
+        const score = payload.score ?? 0;
+        const updates = { gamesPlayed: increment(1) };
+        if (score > (userData?.highScore || 0)) {
             updates.highScore = score;
         }
-        
-        await updateDoc(userRef, updates);
-        
-        // Log the game for admin analytics
-        await setDoc(doc(collection(db, 'games')), {
-            oderId: currentUser.uid,
-            score: score,
-            playedAt: Timestamp.now()
-        });
-        
+        await updateDoc(doc(db, 'users', currentUser.uid), updates);
+
         await loadUserData(currentUser.uid);
         await loadLeaderboard();
-        
-        scoreInput.value = '';
-        alert('Score submitted!');
-    } catch (error) {
-        console.error('Error submitting score:', error);
-        alert('Error submitting score');
+    } catch (err) {
+        console.error('[telemetry] failed to write session:', err);
     }
 });
 
 // Admin Dashboard
+let adminUnsubSessions = null;
+let adminUnsubUsers = null;
+
 async function loadAdminData() {
     if (!userData || !userData.isAdmin) return;
-    
-    try {
-        // Total players
-        const usersSnapshot = await getDocs(collection(db, 'users'));
+
+    if (adminUnsubSessions) { adminUnsubSessions(); adminUnsubSessions = null; }
+    if (adminUnsubUsers) { adminUnsubUsers(); adminUnsubUsers = null; }
+
+    adminUnsubUsers = onSnapshot(collection(db, 'users'), (usersSnapshot) => {
         document.getElementById('total-players').textContent = usersSnapshot.size;
-        
-        // Total games and avg score
-        const gamesSnapshot = await getDocs(collection(db, 'games'));
-        document.getElementById('total-games').textContent = gamesSnapshot.size;
-        
-        let totalScore = 0;
-        gamesSnapshot.forEach(doc => {
-            totalScore += doc.data().score || 0;
-        });
-        const avgScore = gamesSnapshot.size > 0 ? Math.round(totalScore / gamesSnapshot.size) : 0;
-        document.getElementById('avg-score').textContent = avgScore;
-        
-        // New users in last 7 days
+
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
         let newUsers = 0;
         usersSnapshot.forEach(doc => {
             const createdAt = doc.data().createdAt?.toDate();
-            if (createdAt && createdAt > weekAgo) {
-                newUsers++;
-            }
+            if (createdAt && createdAt > weekAgo) newUsers++;
         });
         document.getElementById('new-users').textContent = newUsers;
-        
-        // Build charts
-        buildScoresChart(gamesSnapshot);
-        buildPlayersChart(gamesSnapshot);
-        
-    } catch (error) {
-        console.error('Error loading admin data:', error);
-    }
+    }, (err) => console.error('users snapshot error:', err));
+
+    adminUnsubSessions = onSnapshot(collection(db, 'sessions'), (sessionsSnapshot) => {
+        document.getElementById('total-games').textContent = sessionsSnapshot.size;
+
+        let totalScore = 0;
+        let totalFlaps = 0;
+        sessionsSnapshot.forEach(d => {
+            const s = d.data();
+            totalScore += s.score || 0;
+            totalFlaps += s.flaps || 0;
+        });
+        const avgScore = sessionsSnapshot.size > 0 ? Math.round(totalScore / sessionsSnapshot.size) : 0;
+        const avgFlaps = sessionsSnapshot.size > 0 ? Math.round(totalFlaps / sessionsSnapshot.size) : 0;
+
+        document.getElementById('avg-score').textContent = avgScore;
+        const avgFlapsEl = document.getElementById('avg-flaps');
+        if (avgFlapsEl) avgFlapsEl.textContent = avgFlaps;
+
+        buildScoresChart(sessionsSnapshot);
+        buildPlayersChart(sessionsSnapshot);
+    }, (err) => console.error('sessions snapshot error:', err));
 }
 
-function buildScoresChart(gamesSnapshot) {
+function buildScoresChart(sessionsSnapshot) {
     const ctx = document.getElementById('scores-chart').getContext('2d');
-    
-    // Score ranges
-    const ranges = { '0-50': 0, '51-100': 0, '101-200': 0, '201-500': 0, '500+': 0 };
-    
-    gamesSnapshot.forEach(doc => {
+
+    const ranges = { '0-5': 0, '6-15': 0, '16-30': 0, '31-60': 0, '60+': 0 };
+
+    sessionsSnapshot.forEach(doc => {
         const score = doc.data().score || 0;
-        if (score <= 50) ranges['0-50']++;
-        else if (score <= 100) ranges['51-100']++;
-        else if (score <= 200) ranges['101-200']++;
-        else if (score <= 500) ranges['201-500']++;
-        else ranges['500+']++;
+        if (score <= 5) ranges['0-5']++;
+        else if (score <= 15) ranges['6-15']++;
+        else if (score <= 30) ranges['16-30']++;
+        else if (score <= 60) ranges['31-60']++;
+        else ranges['60+']++;
     });
     
     if (window.scoresChart) window.scoresChart.destroy();
@@ -374,26 +381,25 @@ function buildScoresChart(gamesSnapshot) {
     });
 }
 
-function buildPlayersChart(gamesSnapshot) {
+function buildPlayersChart(sessionsSnapshot) {
     const ctx = document.getElementById('players-chart').getContext('2d');
-    
-    // Games per day (last 7 days)
+
     const days = {};
     const today = new Date();
-    
+
     for (let i = 6; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         const key = d.toLocaleDateString('en-US', { weekday: 'short' });
         days[key] = 0;
     }
-    
-    gamesSnapshot.forEach(doc => {
-        const playedAt = doc.data().playedAt?.toDate();
-        if (playedAt) {
-            const daysSince = Math.floor((today - playedAt) / (1000 * 60 * 60 * 24));
+
+    sessionsSnapshot.forEach(doc => {
+        const endTime = doc.data().endTime?.toDate() || doc.data().startTime?.toDate();
+        if (endTime) {
+            const daysSince = Math.floor((today - endTime) / (1000 * 60 * 60 * 24));
             if (daysSince >= 0 && daysSince < 7) {
-                const key = playedAt.toLocaleDateString('en-US', { weekday: 'short' });
+                const key = endTime.toLocaleDateString('en-US', { weekday: 'short' });
                 if (days.hasOwnProperty(key)) {
                     days[key]++;
                 }
